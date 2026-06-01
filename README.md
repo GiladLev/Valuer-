@@ -4,7 +4,7 @@ A three-step stock valuation studio:
 
 1. **Home** — type a ticker, hit Analyze
 2. **Analysis** — live financials pulled from Financial Modeling Prep, then a fully editable P/E + EV/EBITDA + EV/FCF valuation across Bear / Base / Bull, with margin of safety
-3. **Decision Scorecard** — 10 rejection questions that decide whether the company deserves your money
+3. **Decision Scorecard** — 10 rejection questions that decide whether the company deserves your money, then a one-click handoff to Gemini Deep Research with every number you generated pre-loaded as a structured analyst brief
 
 Built on the StockTalks valuation framework — the multiples model, FCF layer, and 10-question rejection scorecard are translated directly from the original Excel and PDF guide.
 
@@ -89,7 +89,8 @@ valuer/
 │   ├── App.tsx                     # 3-screen router
 │   ├── Home.tsx                    # ticker entry
 │   ├── Analysis.tsx                # the valuation model
-│   └── Scorecard.tsx               # 10-question decision flow
+│   ├── Scorecard.tsx               # 10-question decision flow
+│   └── AIBrief.tsx                 # Gemini handoff prompt builder
 ├── lib/
 │   ├── fmp.ts                      # FMP client (server-side)
 │   ├── scorecard.ts                # the 10 rejection questions
@@ -136,7 +137,23 @@ The questions cover business understanding, market, moat, management alignment, 
 
 ---
 
+## The Gemini handoff
+
+After the verdict, Valuer builds a **research brief** containing every assumption you made, every price target, current LTM figures, and every weak/partial scorecard answer. One click opens Gemini in a new tab with the prompt pre-seeded; **Copy prompt** falls back if the deep-link parameter ever changes.
+
+The brief explicitly asks Gemini to:
+
+1. Sanity-check your numbers against the latest filings
+2. Stress-test each assumption with concrete reference points
+3. Address every WEAK/PARTIAL scorecard item with focused research
+4. Validate Bear/Base/Bull multiples against history and peers
+5. Surface the three biggest risks you're probably not pricing in
+6. Return a BUY / HOLD / PASS call, the price level that flips it, and three quarterly watch items
+
+**Pro tip:** toggle Deep Research on inside Gemini before sending — it'll spend 5–10 minutes pulling real filings instead of a quick reply.
+
+---
+
 ## Disclaimer
 
 Educational use only. Not investment advice. The model returns a number, not a decision. Verify the figures against the filings and consult a licensed advisor before committing capital.
-# Valuer-

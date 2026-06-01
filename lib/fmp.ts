@@ -1,6 +1,5 @@
 // Financial Modeling Prep client. Runs server-side only; key never leaves the server.
-const BASE = "https://financialmodelingprep.com/api/v3";
-const STABLE = "https://financialmodelingprep.com/stable";
+const BASE = "https://financialmodelingprep.com/stable";
 
 function key() {
   const k = process.env.FMP_API_KEY;
@@ -40,27 +39,27 @@ type CashFlow = {
 };
 
 export async function getProfile(ticker: string): Promise<Profile | null> {
-  const arr = await get<Profile[]>(`${BASE}/profile/${ticker}`);
+  const arr = await get<Profile[]>(`${BASE}/profile?symbol=${ticker}`);
   return arr?.[0] ?? null;
 }
 export async function getQuote(ticker: string): Promise<Quote | null> {
-  const arr = await get<Quote[]>(`${BASE}/quote/${ticker}`);
+  const arr = await get<Quote[]>(`${BASE}/quote?symbol=${ticker}`);
   return arr?.[0] ?? null;
 }
 export async function getIncomes(ticker: string, limit = 5) {
-  return get<IncomeStmt[]>(`${BASE}/income-statement/${ticker}?limit=${limit}`);
+  return get<IncomeStmt[]>(`${BASE}/income-statement?symbol=${ticker}&limit=${limit}`);
 }
 export async function getBalances(ticker: string, limit = 5) {
-  return get<BalanceSheet[]>(`${BASE}/balance-sheet-statement/${ticker}?limit=${limit}`);
+  return get<BalanceSheet[]>(`${BASE}/balance-sheet-statement?symbol=${ticker}&limit=${limit}`);
 }
 export async function getCashFlows(ticker: string, limit = 5) {
-  return get<CashFlow[]>(`${BASE}/cash-flow-statement/${ticker}?limit=${limit}`);
+  return get<CashFlow[]>(`${BASE}/cash-flow-statement?symbol=${ticker}&limit=${limit}`);
 }
 export async function getKeyMetrics(ticker: string, limit = 5) {
-  return get<any[]>(`${BASE}/key-metrics/${ticker}?limit=${limit}`);
+  return get<any[]>(`${BASE}/key-metrics?symbol=${ticker}&limit=${limit}`);
 }
 export async function getRatios(ticker: string, limit = 5) {
-  return get<any[]>(`${BASE}/ratios/${ticker}?limit=${limit}`);
+  return get<any[]>(`${BASE}/ratios?symbol=${ticker}&limit=${limit}`);
 }
 
 // Build the full Valuer payload — one network round trip from the client's POV.
@@ -114,8 +113,11 @@ export async function buildFundamentals(rawTicker: string) {
     if (cur && prev) recentGrowth = cur / prev - 1;
   }
 
-  const sharesOut = Number(quote.sharesOutstanding || 0) / 1e6;
+  let sharesOut = Number(quote.sharesOutstanding || 0) / 1e6;
   const marketCap = Number(quote.marketCap || 0) / 1e6;
+  if (!sharesOut && marketCap > 0 && quote.price) {
+    sharesOut = Number(quote.marketCap) / Number(quote.price) / 1e6;
+  }
 
   return {
     ticker,

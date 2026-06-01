@@ -4,14 +4,19 @@ import { useState, useMemo } from "react";
 import { CheckCircle2, AlertTriangle, XCircle, ChevronLeft, ChevronRight, Info, ArrowRight } from "lucide-react";
 import { T, FONT } from "@/lib/theme";
 import { QUESTIONS, bucket } from "@/lib/scorecard";
+import AIBrief from "./AIBrief";
 
 export default function Scorecard({
   ticker,
   companyName,
+  model,
+  results,
   onBack,
 }: {
   ticker: string;
   companyName: string;
+  model: any;
+  results: any;
   onBack: () => void;
 }) {
   const [scores, setScores] = useState<Record<number, number | undefined>>({});
@@ -109,6 +114,18 @@ export default function Scorecard({
                 <WeakItem key={q.id} q={q} tone="amber" />
               ))}
             </div>
+          )}
+
+          {/* AI research brief — sends everything to Gemini for a second opinion */}
+          {model && results && (
+            <AIBrief
+              ticker={ticker}
+              companyName={companyName}
+              scores={scores}
+              total={total}
+              model={model}
+              results={results}
+            />
           )}
 
           <div style={{ display: "flex", gap: 10, marginTop: 22, justifyContent: "center", flexWrap: "wrap" }}>

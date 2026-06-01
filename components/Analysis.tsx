@@ -10,11 +10,11 @@ import { T, FONT } from "@/lib/theme";
 
 const YEARS = [2025, 2026, 2027, 2028, 2029, 2030, 2031];
 
-const nfmt = (v: any, d = 0) => v == null || isNaN(v) ? "—" : Number(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
-const money = (v: any, d = 0) => v == null || isNaN(v) ? "—" : "$" + nfmt(v, d);
-const mm = (v: any) => v == null || isNaN(v) ? "—" : "$" + nfmt(v, 0);
-const pct = (v: any, d = 1) => v == null || isNaN(v) ? "—" : (v * 100).toFixed(d) + "%";
-const mult = (v: any) => v == null || isNaN(v) ? "—" : Number(v).toFixed(1) + "x";
+const nfmt = (v: any, d = 0) => v == null || !isFinite(v) ? "—" : Number(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const money = (v: any, d = 0) => v == null || !isFinite(v) ? "—" : "$" + nfmt(v, d);
+const mm = (v: any) => v == null || !isFinite(v) ? "—" : "$" + nfmt(v, 0);
+const pct = (v: any, d = 1) => v == null || !isFinite(v) ? "—" : (v * 100).toFixed(d) + "%";
+const mult = (v: any) => v == null || !isFinite(v) ? "—" : Number(v).toFixed(1) + "x";
 
 const clampNum = (x: any, fb: number) => (typeof x === "number" && isFinite(x) ? x : fb);
 const round1 = (x: number) => Math.round(x * 10) / 10;
@@ -42,49 +42,77 @@ function buildInitialModel(d: any) {
     daPct: flat(clampNum(d.daPctRevenue, 0.06)),
     taxRate: flat(clampNum(d.effectiveTaxRate, 0.18)),
     avgEvFcf: evf, bearEvFcf: round1(evf * 0.78), baseEvFcf: round1(evf * 0.95), bullEvFcf: round1(evf * 1.2),
-    targetYearIdx: 6, mos: 0.30, method: 3, bandMethod: "pe",
+    targetYearIdx: 6, mos: 0.30, method: 3,
+    bandMethod: d.epsLTM > 0 ? "pe" : (d.lastFyRevenue > 0 ? "eve" : "evf"),
   } as any;
 }
 
 function compute(m: any) {
   const n = YEARS.length;
+  const safeDiv = (num: number, den: number) => den && isFinite(num) && isFinite(den) ? num / den : NaN;
   const rev: number[] = Array(n), ebitda: number[] = Array(n), np: number[] = Array(n), sh: number[] = Array(n), eps: number[] = Array(n);
   rev[0] = m.rev2025; sh[0] = m.shares2025;
-  for (let i = 1; i < n; i++) { rev[i] = rev[i - 1] * (1 + (m.growth[i] || 0)); sh[i] = sh[i - 1] * (1 + (m.dilution[i] || 0)); }
-  for (let i = 0; i < n; i++) { ebitda[i] = rev[i] * m.ebitdaM[i]; np[i] = rev[i] * m.netM[i]; eps[i] = np[i] / sh[i]; }
+  for (let i = 1; i < n; i++) {
+    rev[i] = rev[i - 1] * (1 + (m.growth[i] || 0));
+    sh[i] = sh[i - 1] * (1 + (m.dilution[i] || 0));
+  }
+  for (let i = 0; i < n; i++) {
+    ebitda[i] = rev[i] * m.ebitdaM[i];
+    np[i] = rev[i] * m.netM[i];
+    eps[i] = safeDiv(np[i], sh[i]);
+  }
   const capex: number[] = Array(n), da: number[] = Array(n), ebit: number[] = Array(n);
   const taxes: number[] = Array(n), fcf: number[] = Array(n), fcfM: number[] = Array(n);
   for (let i = 0; i < n; i++) {
-    capex[i] = rev[i] * m.capexPct[i]; da[i] = rev[i] * m.daPct[i];
-    ebit[i] = ebitda[i] - da[i]; taxes[i] = ebit[i] * m.taxRate[i];
-    fcf[i] = ebitda[i] - capex[i] - taxes[i]; fcfM[i] = fcf[i] / rev[i];
+    capex[i] = rev[i] * m.capexPct[i];
+    da[i] = rev[i] * m.daPct[i];
+    ebit[i] = ebitda[i] - da[i];
+    taxes[i] = ebit[i] * m.taxRate[i];
+    fcf[i] = ebitda[i] - capex[i] - taxes[i];
+    fcfM[i] = safeDiv(fcf[i], rev[i]);
   }
   const ev = m.marketCap + m.debt - m.cash - m.securities;
   const ltmEbitda = m.ltmRevenue * m.ltmEbitdaM;
-  const curPE = m.price / m.epsLTM;
-  const curEvE = ev / ltmEbitda;
+  const curPE = safeDiv(m.price, m.epsLTM);
+  const curEvE = safeDiv(ev, ltmEbitda);
   const netDebtLtm = m.debt - m.cash - m.securities;
-  const curEvFcf = ev / fcf[0];
+  const curEvFcf = safeDiv(ev, fcf[0]);
 
   const pe = { bear: Array(n) as number[], base: Array(n) as number[], bull: Array(n) as number[] };
-  for (let i = 0; i < n; i++) { pe.bear[i] = eps[i] * m.bearPE; pe.base[i] = eps[i] * m.basePE; pe.bull[i] = eps[i] * m.bullPE; }
+  for (let i = 0; i < n; i++) {
+    pe.bear[i] = eps[i] * m.bearPE;
+    pe.base[i] = eps[i] * m.basePE;
+    pe.bull[i] = eps[i] * m.bullPE;
+  }
   const eve = { bear: Array(n) as number[], base: Array(n) as number[], bull: Array(n) as number[] };
   for (let i = 0; i < n; i++) {
-    const f = (mu: number) => (ebitda[i] * mu - m.ydebt[i] + m.ycash[i] + m.ysec[i]) / sh[i];
-    eve.bear[i] = f(m.bearEvE); eve.base[i] = f(m.baseEvE); eve.bull[i] = f(m.bullEvE);
+    const f = (mu: number) => safeDiv(ebitda[i] * mu - m.ydebt[i] + m.ycash[i] + m.ysec[i], sh[i]);
+    eve.bear[i] = f(m.bearEvE);
+    eve.base[i] = f(m.baseEvE);
+    eve.bull[i] = f(m.bullEvE);
   }
   const evf = { bear: Array(n) as number[], base: Array(n) as number[], bull: Array(n) as number[] };
   for (let i = 0; i < n; i++) {
-    const f = (mu: number) => (fcf[i] * mu - netDebtLtm) / m.sharesOut;
-    evf.bear[i] = f(m.bearEvFcf); evf.base[i] = f(m.baseEvFcf); evf.bull[i] = f(m.bullEvFcf);
+    const f = (mu: number) => safeDiv(fcf[i] * mu - netDebtLtm, m.sharesOut);
+    evf.bear[i] = f(m.bearEvFcf);
+    evf.base[i] = f(m.baseEvFcf);
+    evf.bull[i] = f(m.bullEvFcf);
   }
-  const fcfYield = fcf.map(x => x / ev);
+  const fcfYield = fcf.map((x) => safeDiv(x, ev));
   const ti = m.targetYearIdx, yearsAhead = ti;
   const baseP_PE = pe.base[ti], baseP_EvE = eve.base[ti];
   const combined = m.method === 1 ? baseP_PE : m.method === 2 ? baseP_EvE : (baseP_PE + baseP_EvE) / 2;
   const buildMethod = (basePrice: number) => {
+    if (!isFinite(basePrice) || !isFinite(m.price) || m.price === 0) {
+      return { base: NaN, after: NaN, up: NaN, cagr: NaN };
+    }
     const after = basePrice * (1 - m.mos);
-    return { base: basePrice, after, up: (after - m.price) / m.price, cagr: Math.pow(after / m.price, 1 / yearsAhead) - 1 };
+    return {
+      base: basePrice,
+      after,
+      up: safeDiv(after - m.price, m.price),
+      cagr: yearsAhead > 0 ? Math.pow(after / m.price, 1 / yearsAhead) - 1 : NaN,
+    };
   };
   const out = { pe: buildMethod(baseP_PE), eve: buildMethod(baseP_EvE), fcf: buildMethod(evf.base[ti]), combined: buildMethod(combined) };
   return { rev, ebitda, np, sh, eps, capex, da, ebit, taxes, fcf, fcfM, fcfYield, ev, ltmEbitda, curPE, curEvE, curEvFcf, netDebtLtm, pe, eve, evf, out, targetYear: YEARS[ti], yearsAhead };
@@ -156,22 +184,33 @@ function ChartTip({ active, payload, label, fmt }: any) {
 
 export default function Analysis({
   data,
+  initialModel,
+  onModelChange,
   onBack,
   onContinue,
 }: {
   data: any;
+  initialModel: any | null;
+  onModelChange: (model: any, results: any) => void;
   onBack: () => void;
   onContinue: (info: { ticker: string; companyName: string }) => void;
 }) {
-  const [m, setM] = useState<any>(() => buildInitialModel(data));
+  // Resume the prior model if we're navigating back, otherwise build fresh from FMP.
+  const [m, setM] = useState<any>(() => initialModel ?? buildInitialModel(data));
   const r = useMemo(() => compute(m), [m]);
+  // Surface every change up to App so the Gemini prompt always has the latest.
+  useEffect(() => { onModelChange(m, r); }, [m, r, onModelChange]);
   const set = (k: string, v: any) => setM((p: any) => ({ ...p, [k]: v }));
   const setArr = (k: string, i: number, v: any) =>
     setM((p: any) => { const a = [...p[k]]; a[i] = v; return { ...p, [k]: a }; });
 
   const projData = YEARS.map((y, i) => ({ year: String(y), Revenue: Math.round(r.rev[i]), EBITDA: Math.round(r.ebitda[i]), FCF: Math.round(r.fcf[i]) }));
-  const bandSrc: any = m.bandMethod === "pe" ? r.pe : m.bandMethod === "eve" ? r.eve : r.evf;
-  const bandData = YEARS.map((y, i) => ({ year: String(y), Bear: +bandSrc.bear[i].toFixed(2), Base: +bandSrc.base[i].toFixed(2), Bull: +bandSrc.bull[i].toFixed(2) }));
+  const sources: any = { pe: r.pe, eve: r.eve, evf: r.evf };
+  const allZero = (arr: number[]) => arr.every((v) => !isFinite(v) || v === 0);
+  const chosenBand = sources[m.bandMethod] && !allZero([...sources[m.bandMethod].bear, ...sources[m.bandMethod].base, ...sources[m.bandMethod].bull])
+    ? sources[m.bandMethod]
+    : Object.values(sources).find((src: any) => !allZero([...src.bear, ...src.base, ...src.bull])) || r.pe;
+  const bandData = YEARS.map((y, i) => ({ year: String(y), Bear: +chosenBand.bear[i].toFixed(2), Base: +chosenBand.base[i].toFixed(2), Bull: +chosenBand.bull[i].toFixed(2) }));
   const cmpData = [
     { name: "P/E", Target: +r.out.pe.after.toFixed(2), up: r.out.pe.up },
     { name: "EV/EBITDA", Target: +r.out.eve.after.toFixed(2), up: r.out.eve.up },
