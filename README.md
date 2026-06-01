@@ -139,3 +139,4 @@ The questions cover business understanding, market, moat, management alignment, 
 ## Disclaimer
 
 Educational use only. Not investment advice. The model returns a number, not a decision. Verify the figures against the filings and consult a licensed advisor before committing capital.
+# Valuer-
