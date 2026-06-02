@@ -1,4 +1,10 @@
 // Financial Modeling Prep client. Runs server-side only; key never leaves the server.
+// FMP's free tier no longer exposes /quote or any statement endpoint (they return 402
+// "Premium / Special Endpoint"). The only data endpoint still free is /profile, which we
+// use purely for the live share price, market cap and company metadata. All financial
+// statements come from SEC EDGAR instead — see lib/sec.ts.
+import { getSecFundamentals } from "@/lib/sec";
+
 const BASE = "https://financialmodelingprep.com/stable";
 
 function key() {
@@ -14,122 +20,73 @@ async function get<T>(url: string): Promise<T> {
   return (await res.json()) as T;
 }
 
-export type Quote = {
-  symbol: string; name: string; price: number; marketCap: number;
-  sharesOutstanding: number; eps: number; pe: number; exchange: string;
-};
+// /profile is the one endpoint the FMP free tier still serves. It carries price + marketCap
+// plus the metadata we surface in the UI.
 export type Profile = {
   symbol: string; companyName: string; currency: string; industry: string;
   sector: string; description: string; image: string; website: string;
-};
-type IncomeStmt = {
-  date: string; calendarYear: string; revenue: number; grossProfit: number;
-  ebitda: number; operatingIncome: number; netIncome: number; eps: number;
-  weightedAverageShsOutDil: number; incomeTaxExpense: number;
-  incomeBeforeTax: number; depreciationAndAmortization: number;
-};
-type BalanceSheet = {
-  date: string; calendarYear: string; totalDebt: number;
-  cashAndCashEquivalents: number; shortTermInvestments: number;
-  longTermInvestments: number; commonStock: number;
-};
-type CashFlow = {
-  date: string; calendarYear: string; capitalExpenditure: number;
-  freeCashFlow: number; operatingCashFlow: number;
+  price: number; marketCap: number; beta: number; exchange: string;
 };
 
 export async function getProfile(ticker: string): Promise<Profile | null> {
   const arr = await get<Profile[]>(`${BASE}/profile?symbol=${ticker}`);
   return arr?.[0] ?? null;
 }
-export async function getQuote(ticker: string): Promise<Quote | null> {
-  const arr = await get<Quote[]>(`${BASE}/quote?symbol=${ticker}`);
-  return arr?.[0] ?? null;
-}
-export async function getIncomes(ticker: string, limit = 5) {
-  return get<IncomeStmt[]>(`${BASE}/income-statement?symbol=${ticker}&limit=${limit}`);
-}
-export async function getBalances(ticker: string, limit = 5) {
-  return get<BalanceSheet[]>(`${BASE}/balance-sheet-statement?symbol=${ticker}&limit=${limit}`);
-}
-export async function getCashFlows(ticker: string, limit = 5) {
-  return get<CashFlow[]>(`${BASE}/cash-flow-statement?symbol=${ticker}&limit=${limit}`);
-}
-export async function getKeyMetrics(ticker: string, limit = 5) {
-  return get<any[]>(`${BASE}/key-metrics?symbol=${ticker}&limit=${limit}`);
-}
-export async function getRatios(ticker: string, limit = 5) {
-  return get<any[]>(`${BASE}/ratios?symbol=${ticker}&limit=${limit}`);
-}
 
-// Build the full Valuer payload — one network round trip from the client's POV.
+// Clamp a market multiple to a sane band, else fall back to a generic default.
+const clampMult = (x: number, lo: number, hi: number, fb: number) =>
+  isFinite(x) && x >= lo && x <= hi ? x : fb;
+
+// Build the full Valuer payload. Statements come from EDGAR (lib/sec.ts); price/market cap
+// and metadata come from FMP /profile. The returned shape is what Analysis.tsx consumes.
 export async function buildFundamentals(rawTicker: string) {
   const ticker = rawTicker.trim().toUpperCase();
-  const [profile, quote, incomes, balances, cashflows, ratios] = await Promise.all([
-    getProfile(ticker), getQuote(ticker), getIncomes(ticker, 5),
-    getBalances(ticker, 5), getCashFlows(ticker, 5), getRatios(ticker, 5),
-  ]);
-  if (!quote) throw new Error(`No data for ${ticker}`);
+  const [profile, sec] = await Promise.all([getProfile(ticker), getSecFundamentals(ticker)]);
 
-  // LTM income — sum the last 4 quarterly statements when available, else fall back to the
-  // most recent annual. Avoids stale annuals dominating a fast-moving company.
-  const ltmIncome = incomes?.[0];
-  const ltmBalance = balances?.[0];
-  const ltmCash = cashflows?.[0];
+  const price = Number(profile?.price || 0);
+  const marketCap = Number(profile?.marketCap || 0) / 1e6; // mm
 
-  const revenue = Number(ltmIncome?.revenue || 0) / 1e6;          // mm
-  const ebitda = Number(ltmIncome?.ebitda || 0) / 1e6;
-  const grossProfit = Number(ltmIncome?.grossProfit || 0) / 1e6;
-  const operatingIncome = Number(ltmIncome?.operatingIncome || 0) / 1e6;
-  const netIncome = Number(ltmIncome?.netIncome || 0) / 1e6;
-  const da = Number(ltmIncome?.depreciationAndAmortization || 0) / 1e6;
+  // Statement lines from EDGAR, scaled to millions.
+  const revenue = sec.revenue / 1e6;
+  const ebitda = sec.ebitda / 1e6;
+  const grossProfit = sec.grossProfit / 1e6;
+  const operatingIncome = sec.operatingIncome / 1e6;
+  const netIncome = sec.netIncome / 1e6;
+  const da = sec.da / 1e6;
+  const capex = sec.capex / 1e6;
+  const fcf = sec.fcf / 1e6;
 
-  const totalDebt = Number(ltmBalance?.totalDebt || 0) / 1e6;
-  const cash = Number(ltmBalance?.cashAndCashEquivalents || 0) / 1e6;
-  const shortInv = Number(ltmBalance?.shortTermInvestments || 0) / 1e6;
-  const longInv = Number(ltmBalance?.longTermInvestments || 0) / 1e6;
+  const totalDebt = sec.totalDebt / 1e6;
+  const cash = sec.cash / 1e6;
+  const marketableSecurities = (sec.shortTermInv + sec.longTermInv) / 1e6;
 
-  const capex = Math.abs(Number(ltmCash?.capitalExpenditure || 0)) / 1e6;
-  const tax = Number(ltmIncome?.incomeTaxExpense || 0) / 1e6;
-  const ebt = Number(ltmIncome?.incomeBeforeTax || 0) / 1e6;
-  const effTax = ebt > 0 ? tax / ebt : 0.18;
+  // Shares outstanding: derive from the live market cap/price (most current), else fall
+  // back to EDGAR's reported share count.
+  let sharesOut = price > 0 && marketCap > 0 ? (marketCap * 1e6) / price / 1e6 : 0;
+  if (!sharesOut) sharesOut = sec.sharesOutstanding / 1e6;
 
-  // 5Y averages from the ratios endpoint (descending order)
-  const avg = (arr: any[], k: string) => {
-    const xs = (arr || []).map((r) => Number(r?.[k])).filter((x) => isFinite(x) && x > 0);
-    if (!xs.length) return 0;
-    return xs.reduce((a, b) => a + b, 0) / xs.length;
-  };
-  const avgPE = avg(ratios, "priceEarningsRatio");
-  const avgEvEbitda = avg(ratios, "enterpriseValueMultiple");
-  const avgEvFcf =
-    avg(ratios, "priceToFreeCashFlowsRatio") || avg(ratios, "priceToFreeCashFlowRatio") || 22;
+  const recentGrowth = sec.revenuePrev > 0 ? sec.revenue / sec.revenuePrev - 1 : 0.1;
 
-  // Recent revenue growth from the income series (year-over-year)
-  let recentGrowth = 0.1;
-  if (incomes && incomes.length >= 2) {
-    const cur = Number(incomes[0].revenue);
-    const prev = Number(incomes[1].revenue);
-    if (cur && prev) recentGrowth = cur / prev - 1;
-  }
-
-  let sharesOut = Number(quote.sharesOutstanding || 0) / 1e6;
-  const marketCap = Number(quote.marketCap || 0) / 1e6;
-  if (!sharesOut && marketCap > 0 && quote.price) {
-    sharesOut = Number(quote.marketCap) / Number(quote.price) / 1e6;
-  }
+  // No free source carries 5Y price history, so the "5Y average" multiples are seeded from
+  // the current market multiple (a defensible, company-specific neutral anchor) and clamped
+  // to sane bands; the user can override every one of these in the model.
+  const epsLTM = Number(sec.epsDiluted || (sharesOut ? netIncome / sharesOut : 0));
+  const ev = marketCap + totalDebt - cash - marketableSecurities;
+  const avgPE5Y = clampMult(epsLTM > 0 ? price / epsLTM : 0, 5, 60, 20);
+  const avgEvEbitda5Y = clampMult(ebitda > 0 ? ev / ebitda : 0, 4, 40, 14);
+  const avgEvFcf5Y = clampMult(fcf > 0 ? ev / fcf : 0, 5, 60, 22);
 
   return {
     ticker,
-    companyName: profile?.companyName || quote.name || ticker,
+    companyName: profile?.companyName || sec.entityName || ticker,
     currency: profile?.currency || "USD",
-    price: Number(quote.price || 0),
+    price,
     sharesOut,
     marketCap,
-    epsLTM: Number(quote.eps || ltmIncome?.eps || 0),
+    epsLTM,
     totalDebt,
     cash,
-    marketableSecurities: shortInv + longInv,
+    marketableSecurities,
     ltmRevenue: revenue,
     ltmEbitdaMargin: revenue > 0 ? ebitda / revenue : 0,
     lastFyRevenue: revenue,
@@ -140,9 +97,9 @@ export async function buildFundamentals(rawTicker: string) {
     revenueGrowthRecent: recentGrowth,
     capexPctRevenue: revenue > 0 ? capex / revenue : 0.06,
     daPctRevenue: revenue > 0 ? da / revenue : 0.06,
-    effectiveTaxRate: effTax,
-    avgPE5Y: avgPE || 20,
-    avgEvEbitda5Y: avgEvEbitda || 14,
-    avgEvFcf5Y: avgEvFcf || 22,
+    effectiveTaxRate: sec.effectiveTaxRate,
+    avgPE5Y,
+    avgEvEbitda5Y,
+    avgEvFcf5Y,
   };
 }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Search, Loader2, TrendingUp, AlertTriangle, Layers, ArrowRight } from "lucide-react";
 import { T, FONT } from "@/lib/theme";
+import { QUESTIONS } from "@/lib/scorecard";
 
 const POPULAR = ["AAPL", "NVDA", "GOOGL", "META", "MSFT", "TSLA", "AMZN", "NFLX"];
 
@@ -49,8 +50,8 @@ export default function Home({ onLoaded }: { onLoaded: (data: any) => void }) {
           Should you buy this stock?
         </h1>
         <p style={{ color: T.dim, fontSize: 16, textAlign: "center", margin: "0 0 36px", fontWeight: 500, lineHeight: 1.55 }}>
-          Enter a ticker. We pull the live financials, run a P/E + EV/EBITDA + FCF valuation,
-          then walk you through the 10 questions that decide whether it's worth your money.
+          Enter a ticker. We pull the financials, run a P/E + EV/EBITDA + FCF valuation,
+          then walk you through the {QUESTIONS.length} questions that decide whether it's worth your money.
         </p>
 
         {/* Search card */}
@@ -92,7 +93,7 @@ export default function Home({ onLoaded }: { onLoaded: (data: any) => void }) {
           {error && (
             <div style={{ marginTop: 14, display: "flex", alignItems: "flex-start", gap: 9, padding: "11px 14px", background: T.peachSoft, border: `1px solid ${T.border}`, borderRadius: 11, color: T.peach, fontSize: 13, fontWeight: 500 }}>
               <AlertTriangle size={15} style={{ marginTop: 1, flexShrink: 0 }} />
-              <span>{error}. The FMP free tier covers US listings — check the ticker spelling or try again.</span>
+              <span>{error}. Fundamentals come from SEC EDGAR, which covers US-listed companies that file 10-Ks — check the ticker spelling or try another US listing.</span>
             </div>
           )}
 
@@ -121,9 +122,9 @@ export default function Home({ onLoaded }: { onLoaded: (data: any) => void }) {
         {/* Flow */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 12, marginTop: 22 }}>
           {[
-            ["01", "Live Financials", "Income, balance, cash flow — pulled from Financial Modeling Prep."],
+            ["01", "Real Financials", "Income, balance, cash flow — pulled from SEC EDGAR filings."],
             ["02", "Valuation Model", "P/E, EV/EBITDA, and EV/FCF across Bear / Base / Bull scenarios."],
-            ["03", "The Decision", "10 rejection questions that decide if you have enough conviction."],
+            ["03", "The Decision", `${QUESTIONS.length} rejection questions that decide if you have enough conviction.`],
           ].map(([n, lab, desc]) => (
             <div key={n} style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: "13px 15px", boxShadow: T.shadowSm }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>

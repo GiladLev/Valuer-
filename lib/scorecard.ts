@@ -1,98 +1,72 @@
-// The 10 StockTalks Rejection Scorecard questions. Each: 0 (weak) / 1 (partial) / 2 (strong).
-// Final score buckets: >=16 deep research, 11-15 partial knowledge, <11 reject.
+// The StockTalks Rejection Scorecard, trimmed to 5 Buffett-style essentials. Each question
+// folds in several of the original ten so nothing important is lost — the management,
+// momentum and risk angles are merged into the question they belong to. Score each
+// 0 (weak) / 1 (partial) / 2 (strong). Buckets scale with the question count (see bucket()).
 export type Question = { id: number; title: string; sub: string; redFlag: string; tip: string };
 
 export const QUESTIONS: Question[] = [
   {
     id: 1,
-    title: "Do I understand how the business makes money?",
-    sub: "Can I explain the business model in one paragraph and identify every revenue stream?",
+    title: "Do I understand the business and its market?",
+    sub: "Can I explain in one paragraph how it makes money and every revenue stream — and is the market it serves large and still relevant in 10 years?",
     redFlag:
-      "If you can't articulate clearly how the company generates revenue, the business isn't understood well enough — move on.",
-    tip: "Open the annual 10-K. Read Item 1 (Business) and Item 7 (MD&A) for revenue split by segment and geography.",
+      "If you can't articulate how the company earns its revenue, or its market is shrinking, the business isn't understood well enough — move on.",
+    tip: "Read Item 1 (Business) and Item 7 (MD&A) of the 10-K for the revenue split by segment and geography; cross-check any TAM claims against independent industry reports.",
   },
   {
     id: 2,
-    title: "Is the target market large and growing?",
-    sub: "Is this industry expanding, and will it still matter in 10 years?",
+    title: "Does it have a durable competitive advantage?",
+    sub: "What stops competitors from copying it? Does it have pricing power — and is that edge actually showing up as improving margins and cash flow?",
     redFlag:
-      "A great company in a shrinking market is rarely a great investment.",
-    tip: "Look at investor presentations for TAM slides; cross-check the numbers against independent industry reports.",
+      "If the only edge is being cheaper, that's not a moat. Stalled or shrinking margins suggest the advantage is eroding.",
+    tip: "Read 'Risk Factors' (Item 1A). Compare operating and net margins to direct peers and across 3–5 years — a real moat widens margins over time, it doesn't compress them.",
   },
   {
     id: 3,
-    title: "Does the company have a competitive advantage?",
-    sub: "What makes it different? Why can't competitors copy it easily? Does it have pricing power?",
+    title: "Is management high-quality and aligned with shareholders?",
+    sub: "Do executives own meaningful stock, allocate capital at attractive ROIC, and avoid chronic dilution or buybacks at silly prices?",
     redFlag:
-      "If the only edge is being cheaper, that's not a real moat — low price alone rarely creates durable economics.",
-    tip: "Read 'Risk Factors' in the 10-K (Item 1A). Compare operating margins against direct competitors to see real pricing power.",
+      "Tiny insider ownership, value-destroying acquisitions, or relentless share issuance all mean management may not be working in your interest.",
+    tip: "Proxy (DEF 14A) for insider ownership; cash-flow-from-investing for acquisitions and capex; track diluted share count and stock-based comp vs free cash flow year over year.",
   },
   {
     id: 4,
-    title: "Is management aligned with shareholders?",
-    sub: "Do executives own meaningful stock? Do they win when shareholders win? Is there a track record of value creation?",
+    title: "Is the balance sheet strong and the business low-risk?",
+    sub: "Enough liquidity to survive a downturn without dilutive raises — and is revenue free of dangerous customer concentration or regulatory threats?",
     redFlag:
-      "Tiny insider ownership creates misaligned incentives — they may not act in your interest.",
-    tip: "Read the Proxy Statement (DEF 14A) — look for 'Security Ownership of Certain Beneficial Owners and Management'.",
+      "High leverage with near-term maturities and thin cash — or revenue hostage to one customer or regulator — can sink an otherwise good business.",
+    tip: "Compare cash + short-term investments to total debt and current liabilities. The SEC requires disclosing any customer >10% of revenue (Item 1); read Item 1A for regulatory risk.",
   },
   {
     id: 5,
-    title: "Does management allocate capital well?",
-    sub: "Is ROIC attractive? Did past acquisitions create value? Are retained earnings generating returns?",
-    redFlag: "Growth without return on invested capital is value destruction.",
-    tip: "Cash flow from investing reveals acquisitions and capex. Check whether they translated into sustained operating-income growth in subsequent years.",
-  },
-  {
-    id: 6,
-    title: "Does management create or destroy shareholder value?",
-    sub: "Is share count rising or falling? Is SBC excessive? Do buybacks happen at sensible prices?",
-    redFlag:
-      "Chronic dilution is a silent tax — your ownership shrinks year after year.",
-    tip: "Track diluted weighted-average shares year over year. Compare stock-based compensation to free cash flow.",
-  },
-  {
-    id: 7,
-    title: "Is the business actually improving?",
-    sub: "Are revenue, margins, and FCF trending up? Is earnings growth accelerating?",
-    redFlag:
-      "Stalled growth, margins, and cash flow → there are usually better opportunities elsewhere.",
-    tip: "Compare 3–5 years of 10-Ks side by side. Don't just track revenue — verify that operating and net margins expand, not contract.",
-  },
-  {
-    id: 8,
-    title: "Is the balance sheet strong enough to survive a downturn?",
-    sub: "Enough liquidity, or drowning in debt that becomes painful in a high-rate or recession environment?",
-    redFlag:
-      "Highly levered + near-term maturities + thin cash → forced dilutive raises or worse.",
-    tip: "Compare cash + short-term investments to short-term and long-term debt. Current assets should comfortably cover current liabilities.",
-  },
-  {
-    id: 9,
-    title: "Customer concentration or heavy regulatory risk?",
-    sub: "Does revenue depend on a few large customers? Does regulation threaten the core business?",
-    redFlag:
-      "The more revenue tied to one customer, the larger the blow if they leave.",
-    tip: "SEC requires disclosure for any customer >10% of revenue — often in Item 1 of the 10-K. Read Item 1A carefully for regulatory risk.",
-  },
-  {
-    id: 10,
     title: "Does today's price offer a margin of safety?",
-    sub: "Does the current price reflect business reality, or has the market priced in every piece of good news?",
+    sub: "Does the current price reflect business reality, or has the market already priced in every piece of good news?",
     redFlag:
       "A great company at a stretched multiple can still deliver poor stock returns — expectations are already in the price.",
-    tip: "Compare current P/E, EV/FCF, EV/EBIT vs the company's own historical average AND sector peers. Don't overpay for growth that may never arrive.",
+    tip: "Compare current P/E, EV/FCF and EV/EBITDA to the company's own historical average AND sector peers. Don't overpay for growth that may never arrive.",
   },
 ];
 
+// Max points and verdict thresholds scale with the number of questions (2 pts each).
+export const MAX_SCORE = QUESTIONS.length * 2;
+const GREEN = Math.round(MAX_SCORE * 0.8); // 80% → worth deeper research
+const AMBER = Math.round(MAX_SCORE * 0.5); // 50% → proceed carefully
+
+export const LEGEND = [
+  { range: `${GREEN}–${MAX_SCORE}`, label: "Worth deep research", tone: "green" as const },
+  { range: `${AMBER}–${GREEN - 1}`, label: "Proceed carefully", tone: "amber" as const },
+  { range: `0–${AMBER - 1}`, label: "Reject", tone: "red" as const },
+];
+
 export function bucket(total: number) {
-  if (total >= 16)
+  if (total >= GREEN)
     return {
       label: "Worth deeper research",
       tone: "green" as const,
       detail:
         "The fundamentals check out and you've demonstrated real understanding. Move on to deep dive — read filings, build the valuation, watch for price.",
     };
-  if (total >= 11)
+  if (total >= AMBER)
     return {
       label: "Partial knowledge — proceed carefully",
       tone: "amber" as const,

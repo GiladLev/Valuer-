@@ -3,10 +3,10 @@
 A three-step stock valuation studio:
 
 1. **Home** — type a ticker, hit Analyze
-2. **Analysis** — live financials pulled from Financial Modeling Prep, then a fully editable P/E + EV/EBITDA + EV/FCF valuation across Bear / Base / Bull, with margin of safety
-3. **Decision Scorecard** — 10 rejection questions that decide whether the company deserves your money, then a one-click handoff to Gemini Deep Research with every number you generated pre-loaded as a structured analyst brief
+2. **Analysis** — financial statements pulled from SEC EDGAR and live price/market cap from Financial Modeling Prep, then a fully editable P/E + EV/EBITDA + EV/FCF valuation across Bear / Base / Bull, with margin of safety
+3. **Decision Scorecard** — 5 rejection questions that decide whether the company deserves your money, then a one-click handoff to Gemini Deep Research with every number you generated pre-loaded as a structured analyst brief
 
-Built on the StockTalks valuation framework — the multiples model, FCF layer, and 10-question rejection scorecard are translated directly from the original Excel and PDF guide.
+Built on the StockTalks valuation framework — the multiples model, FCF layer, and rejection scorecard are translated directly from the original Excel and PDF guide.
 
 ---
 
@@ -16,7 +16,7 @@ Built on the StockTalks valuation framework — the multiples model, FCF layer, 
 - **React 19** + **TypeScript**
 - **Recharts** for charts, **lucide-react** for icons
 - **Plus Jakarta Sans** for the typography
-- Data: **Financial Modeling Prep** (free tier covers US listings)
+- Data: **SEC EDGAR** for financial statements (free, official, US filers) + **Financial Modeling Prep** `/profile` for live price & market cap
 
 ---
 
@@ -43,7 +43,7 @@ Open <http://localhost:3000>.
 FMP_API_KEY=your_key_here
 ```
 
-The free tier returns annual statements for US-listed companies and is enough for everything Valuer does.
+FMP's free tier no longer exposes `/quote` or any statement endpoint (they return `402 Payment Required`), so Valuer only uses the still-free `/profile` endpoint for live price and market cap. All financial statements come from **SEC EDGAR**, which is free, needs no key, and covers any US company that files a 10-K. EDGAR asks callers to send a contact email in the `User-Agent`; set your own with `SEC_USER_AGENT="Your Name your@email.com"` in `.env.local` (a default is provided).
 
 ---
 
@@ -81,7 +81,7 @@ If `.env.local` exists, it stays untracked (`.gitignore` covers it). **Never com
 valuer/
 ├── app/
 │   ├── api/
-│   │   └── fundamentals/route.ts   # server route — calls FMP, returns JSON
+│   │   └── fundamentals/route.ts   # server route — calls EDGAR + FMP, returns JSON
 │   ├── globals.css
 │   ├── layout.tsx
 │   └── page.tsx
@@ -89,11 +89,12 @@ valuer/
 │   ├── App.tsx                     # 3-screen router
 │   ├── Home.tsx                    # ticker entry
 │   ├── Analysis.tsx                # the valuation model
-│   ├── Scorecard.tsx               # 10-question decision flow
+│   ├── Scorecard.tsx               # 5-question decision flow
 │   └── AIBrief.tsx                 # Gemini handoff prompt builder
 ├── lib/
-│   ├── fmp.ts                      # FMP client (server-side)
-│   ├── scorecard.ts                # the 10 rejection questions
+│   ├── fmp.ts                      # FMP /profile client + buildFundamentals orchestrator
+│   ├── sec.ts                      # SEC EDGAR companyfacts client (financial statements)
+│   ├── scorecard.ts                # the 5 rejection questions
 │   └── theme.ts                    # shared design tokens
 ├── .env.example
 └── package.json
@@ -127,13 +128,13 @@ The combined case averages P/E and EV/EBITDA by default — switch to either in 
 
 ## How the scorecard works
 
-10 questions, each scored 0 (weak) / 1 (partial) / 2 (strong):
+5 questions, each scored 0 (weak) / 1 (partial) / 2 (strong) — max 10 points:
 
-- **16–20** → Worth deeper research
-- **11–15** → Partial knowledge, proceed carefully
-- **0–10** → Reject
+- **8–10** → Worth deeper research
+- **5–7** → Partial knowledge, proceed carefully
+- **0–4** → Reject
 
-The questions cover business understanding, market, moat, management alignment, capital allocation, shareholder value, business momentum, balance sheet, concentration risk, and valuation.
+The five questions distil the original ten: (1) understanding the business and its market, (2) durable competitive advantage and momentum, (3) management quality, alignment and capital allocation, (4) balance-sheet strength and concentration/regulatory risk, and (5) valuation / margin of safety.
 
 ---
 

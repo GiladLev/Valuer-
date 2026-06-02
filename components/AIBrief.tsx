@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, type CSSProperties } from "react";
 import { Sparkles, Copy, Check, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
 import { T, FONT } from "@/lib/theme";
-import { QUESTIONS, bucket } from "@/lib/scorecard";
+import { QUESTIONS, bucket, MAX_SCORE } from "@/lib/scorecard";
 
 type Props = {
   ticker: string;
@@ -18,6 +18,11 @@ const pct = (v: any, d = 1) => (v == null || isNaN(v) ? "—" : (v * 100).toFixe
 const money = (v: any, d = 0) => (v == null || isNaN(v) ? "—" : "$" + Number(v).toLocaleString("en-US", { maximumFractionDigits: d, minimumFractionDigits: d }));
 const mult = (v: any) => (v == null || isNaN(v) ? "—" : Number(v).toFixed(1) + "x");
 const mm = (v: any) => (v == null || isNaN(v) ? "—" : "$" + Math.round(v).toLocaleString("en-US") + "mm");
+
+const kbd: CSSProperties = {
+  fontFamily: "'JetBrains Mono', 'SF Mono', Menlo, monospace", fontSize: 11, fontWeight: 700,
+  background: "#fff", border: `1px solid ${T.green}55`, borderRadius: 5, padding: "1px 5px", margin: "0 1px",
+};
 
 function buildPrompt({ ticker, companyName, scores, total, model, results }: Props): string {
   const v = bucket(total);
@@ -90,9 +95,9 @@ D. RESULTING TARGET PRICES (year ${targetYear}, after ${pct(model.mos, 0)} margi
 • Combined (Buy-below): ${money(results.out.combined.after, 2)}    → ${results.out.combined.up >= 0 ? "+" : ""}${pct(results.out.combined.up)} upside  ·  ${pct(results.out.combined.cagr)} expected CAGR
 
 ==============================
-E. MY QUALITATIVE SCORECARD (10 questions, 0/1/2 each)
+E. MY QUALITATIVE SCORECARD (${QUESTIONS.length} questions, 0/1/2 each)
 ==============================
-Total: ${total}/20  →  Verdict: ${v.label}
+Total: ${total}/${MAX_SCORE}  →  Verdict: ${v.label}
 
 STRONG (scored 2):
 ${list(strong)}
@@ -127,6 +132,7 @@ Be direct. I'd rather be told I'm wrong now than learn it from the market later.
 
 export default function AIBrief(props: Props) {
   const [copied, setCopied] = useState(false);
+  const [sent, setSent] = useState(false);
   const [open, setOpen] = useState(false);
   const prompt = useMemo(() => buildPrompt(props), [props]);
 
@@ -138,11 +144,17 @@ export default function AIBrief(props: Props) {
   }
 
   function openInGemini() {
-    // gemini.google.com accepts a ?q= seed param; if it ever stops working,
-    // the clipboard is auto-populated so the user can paste straight away.
-    navigator.clipboard.writeText(prompt).catch(() => {});
+    // Gemini has no native way to prefill a prompt from a link — only the "Gemini URL Prompt"
+    // browser extension reads ?q=, and this brief is far longer than any URL could carry. So we
+    // open Gemini AND copy the brief to the clipboard in the same click, making it a single
+    // Ctrl/Cmd+V away. We open the window first (synchronously, so popup blockers don't fire and
+    // the click gesture is preserved), then copy. ?q= stays for anyone who has the extension.
     const url = `https://gemini.google.com/app?q=${encodeURIComponent(prompt)}`;
     window.open(url, "_blank", "noopener,noreferrer");
+    navigator.clipboard.writeText(prompt).then(() => {
+      setSent(true);
+      setTimeout(() => setSent(false), 8000);
+    }).catch(() => {});
   }
 
   return (
@@ -214,13 +226,26 @@ export default function AIBrief(props: Props) {
         </button>
       </div>
 
+      {sent && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8, marginBottom: 12,
+          fontSize: 12.5, fontWeight: 600, color: T.green,
+          background: T.greenSoft, border: `1px solid ${T.green}33`, borderRadius: 10,
+          padding: "10px 13px",
+        }}>
+          <Check size={15} />
+          Prompt copied to your clipboard — paste it into Gemini with <kbd style={kbd}>Ctrl/⌘</kbd>+<kbd style={kbd}>V</kbd>.
+        </div>
+      )}
+
       <div style={{
         fontSize: 11.5, color: T.faint, fontWeight: 500,
         background: T.card, border: `1px solid ${T.border}`, borderRadius: 10,
         padding: "9px 13px", lineHeight: 1.5,
       }}>
-        <strong style={{ color: T.dim }}>Pro tip:</strong> in Gemini, open the prompt then toggle on{" "}
-        <strong style={{ color: T.text }}>Deep Research</strong>. It'll spend 5–10 minutes pulling filings
+        <strong style={{ color: T.dim }}>Pro tip:</strong> Gemini can't be pre-filled by a link, so we copy the brief
+        to your clipboard when you open it — just <strong style={{ color: T.text }}>paste</strong> it in. Then toggle on{" "}
+        <strong style={{ color: T.text }}>Deep Research</strong> and it'll spend 5–10 minutes pulling filings
         and writing a real report instead of a quick reply.
       </div>
 

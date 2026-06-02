@@ -161,6 +161,21 @@ function SectionTitle({ n, children, hint }: any) {
     </div>
   );
 }
+// Inline "what this section does" note plus the formulas behind it.
+function Explain({ children, formulas }: { children: React.ReactNode; formulas?: string[] }) {
+  return (
+    <div style={{ background: T.soft, border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 14px", marginBottom: 16, marginTop: -4 }}>
+      <div style={{ fontSize: 12.5, color: T.dim, lineHeight: 1.6, fontWeight: 500, fontFamily: FONT }}>{children}</div>
+      {formulas && formulas.length > 0 && (
+        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 5 }}>
+          {formulas.map((f, i) => (
+            <code key={i} style={{ fontFamily: "'JetBrains Mono','SF Mono',Menlo,monospace", fontSize: 11.5, color: T.violetText, background: T.violetSoft, border: `1px solid ${T.violetBorder}`, borderRadius: 7, padding: "5px 9px", width: "fit-content", fontVariantNumeric: "tabular-nums" }}>{f}</code>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 const Th = ({ children, w }: any) => (
   <th style={{ ...s.num, color: T.faint, fontSize: 11, fontWeight: 600, textAlign: "right", padding: "6px 8px", borderBottom: `1px solid ${T.border}`, width: w }}>{children}</th>
 );
@@ -260,6 +275,18 @@ export default function Analysis({
         {/* 01 Basics */}
         <div style={{ ...s.card, marginBottom: 18 }}>
           <SectionTitle n="01" hint="EV = Market Cap + Debt − Cash − Securities">The Basics</SectionTitle>
+          <Explain formulas={[
+            "Market Cap = Share Price × Shares Outstanding",
+            "EV = Market Cap + Total Debt − Cash − Marketable Securities",
+            "P/E (LTM) = Share Price ÷ EPS",
+            "EV/EBITDA (LTM) = EV ÷ (LTM Revenue × LTM EBITDA Margin)",
+            "EV/FCF (LTM) = EV ÷ Free Cash Flow",
+          ]}>
+            A live snapshot of how the market prices the company today. <b>Enterprise Value</b> is what it
+            costs to buy the whole business — equity plus debt, minus the cash you'd inherit. The trailing
+            (LTM) multiples below show how rich today's price is against last-twelve-months earnings, EBITDA
+            and free cash flow. Everything pre-fills from the filings; edit any violet cell to override.
+          </Explain>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
             <Stat label="Share Price" value={money(m.price, 2)} color={T.violet} />
             <Stat label="Market Cap" value={mm(m.marketCap) + "mm"} />
@@ -287,6 +314,18 @@ export default function Analysis({
         {/* 02 Forecast */}
         <div style={{ ...s.card, marginBottom: 18 }}>
           <SectionTitle n="02" hint="violet rows are your assumptions">5-Year Forecast</SectionTitle>
+          <Explain formulas={[
+            "Revenue(t) = Revenue(t−1) × (1 + Growth(t))",
+            "EBITDA(t) = Revenue(t) × EBITDA Margin(t)",
+            "Net Profit(t) = Revenue(t) × Net Margin(t)",
+            "Shares(t) = Shares(t−1) × (1 + Dilution(t))",
+            "EPS(t) = Net Profit(t) ÷ Shares(t)",
+          ]}>
+            Your view of the business over the next six years. You set growth, margins and dilution (the
+            violet cells); the model compounds revenue forward year by year, applies your margins to get
+            EBITDA and net profit, and grows the share count by your dilution to land on EPS. Growth defaults
+            to a gentle decay toward the long run — change it to match your own thesis.
+          </Explain>
           <div style={{ overflowX: "auto" }}>
             <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 720 }}>
               <thead><tr><Th w={150}></Th>{YEARS.map((y) => <Th key={y}>{y}</Th>)}<Th>CAGR</Th></tr></thead>
@@ -328,14 +367,36 @@ export default function Analysis({
         {/* 03 / 04 */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(330px,1fr))", gap: 18, marginBottom: 18 }}>
           <ValBox title="P/E Valuation" n="03" current={mult(r.curPE)} avgKey="avgPE"
+            explain={<Explain formulas={["Price(t) = EPS(t) × P/E multiple"]}>
+              Values the company on its earnings. Set what you'd pay per dollar of EPS — the multiple — in
+              each scenario, and the model applies it to every forecast year's EPS to get an implied share
+              price. The "5Y Avg" seeds a neutral anchor; Bear / Base / Bull scale off it.
+            </Explain>}
             rows={[["Bear", "bearPE", r.pe.bear, T.red], ["Base", "basePE", r.pe.base, T.text], ["Bull", "bullPE", r.pe.bull, T.green]]} m={m} set={set} priceFmt={(v: any) => money(v, 0)} />
           <ValBox title="EV/EBITDA Valuation" n="04" current={mult(r.curEvE)} avgKey="avgEvE"
+            explain={<Explain formulas={["Price(t) = (EBITDA(t) × multiple − Debt(t) + Cash(t) + Securities(t)) ÷ Shares(t)"]}>
+              Values the whole enterprise on operating cash earnings, then bridges back to a per-share equity
+              price by adding net cash and dividing by shares. Handy when earnings are distorted by leverage,
+              tax or one-off items that EBITDA strips out.
+            </Explain>}
             rows={[["Bear", "bearEvE", r.eve.bear, T.red], ["Base", "baseEvE", r.eve.base, T.text], ["Bull", "bullEvE", r.eve.bull, T.green]]} m={m} set={set} priceFmt={(v: any) => money(v, 0)} />
         </div>
 
         {/* 05 FCF */}
         <div style={{ ...s.card, marginBottom: 18 }}>
           <SectionTitle n="05" hint="FCF = EBITDA − Capex − Taxes">Free Cash Flow Layer</SectionTitle>
+          <Explain formulas={[
+            "Capex(t) = Revenue(t) × Capex%(t)",
+            "EBIT(t) = EBITDA(t) − D&A(t)",
+            "Taxes(t) = EBIT(t) × Tax Rate(t)",
+            "FCF(t) = EBITDA(t) − Capex(t) − Taxes(t)",
+            "FCF Margin = FCF(t) ÷ Revenue(t)   ·   FCF Yield = FCF(t) ÷ EV",
+          ]}>
+            Free cash flow is the cash left after the business pays its taxes and reinvests in itself —
+            the money actually available to owners. Capex and D&A are set as a % of revenue, and cash taxes
+            are charged on EBIT (EBITDA minus D&A). The EV/FCF valuation below then prices the company off
+            this cash stream.
+          </Explain>
           <div style={{ overflowX: "auto" }}>
             <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 720 }}>
               <thead><tr><Th w={150}></Th>{YEARS.map((y) => <Th key={y}>{y}</Th>)}<Th>CAGR</Th></tr></thead>
@@ -354,6 +415,11 @@ export default function Analysis({
           </div>
           <div style={{ marginTop: 16 }}>
             <ValBox embedded title="EV/FCF Valuation" current={mult(r.curEvFcf)} avgKey="avgEvFcf"
+              explain={<Explain formulas={["Price(t) = (FCF(t) × multiple − Net Debt) ÷ Shares", "Net Debt = Debt − Cash − Securities"]}>
+                Prices the enterprise on the free cash flow built above, then nets out debt to reach equity
+                value per share. The most cash-grounded of the three methods — it ignores accounting profit
+                and looks only at cash the business actually throws off.
+              </Explain>}
               rows={[["Bear", "bearEvFcf", r.evf.bear, T.red], ["Base", "baseEvFcf", r.evf.base, T.text], ["Bull", "bullEvFcf", r.evf.bull, T.green]]} m={m} set={set} priceFmt={(v: any) => money(v, 0)}
               note="Net Debt (LTM) = Debt − Cash − Securities. Price = (FCF × mult − Net Debt) ÷ Shares." netDebt={r.netDebtLtm} />
           </div>
@@ -369,6 +435,12 @@ export default function Analysis({
               ))}
             </div>
           </div>
+          <Explain>
+            The Bear / Base / Bull share-price trajectory implied by the method you pick above, plotted
+            against today's price (the dashed line). It's the same per-scenario price formula from sections
+            03–05, shown year by year so you can see where the price could travel — and how far the Bear
+            case sits below where the stock trades now.
+          </Explain>
           <div style={{ height: 280 }}>
             <ResponsiveContainer>
               <AreaChart data={bandData} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
@@ -395,6 +467,17 @@ export default function Analysis({
         {/* 06 MoS */}
         <div style={{ ...s.card, marginBottom: 18 }}>
           <SectionTitle n="06" hint={`Target year: ${r.targetYear}`}>Margin of Safety & Final Target</SectionTitle>
+          <Explain formulas={[
+            "Combined = (P/E Base + EV/EBITDA Base) ÷ 2",
+            "Buy-below = Base target × (1 − Margin of Safety)",
+            "Upside = (Buy-below − Current price) ÷ Current price",
+            "CAGR = (Buy-below ÷ Current price) ^ (1 ÷ years ahead) − 1",
+          ]}>
+            Where the projections become a decision. Choose a target year and method, take the <b>Base-case</b>
+            {" "}price for that year, then cut it by your margin of safety — a deliberate discount that protects
+            you when your assumptions prove optimistic. That gives a disciplined <b>buy-below</b> price; the
+            upside and annualised CAGR measure it against today's price.
+          </Explain>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 12, marginBottom: 18 }}>
             <div style={{ background: T.soft, border: `1px solid ${T.border}`, borderRadius: 12, padding: "11px 14px" }}>
               <div style={s.label}>Target Year</div>
@@ -497,11 +580,12 @@ function FRow({ label, cells, edit, first, cagr }: any) {
   );
 }
 function Spacer() { return <tr><td colSpan={9} style={{ height: 9 }} /></tr>; }
-function ValBox({ title, n, current, avgKey, rows, m, set, priceFmt, embedded, note, netDebt }: any) {
+function ValBox({ title, n, current, avgKey, rows, m, set, priceFmt, embedded, note, netDebt, explain }: any) {
   return (
     <div style={embedded ? {} : { ...s.card }}>
       {n && <SectionTitle n={n}>{title}</SectionTitle>}
       {embedded && <h3 style={{ ...s.h, fontSize: 15, margin: "0 0 13px", color: T.text }}>{title}</h3>}
+      {explain}
       <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
         <div style={{ background: T.soft, border: `1px solid ${T.border}`, borderRadius: 11, padding: "7px 13px" }}>
           <span style={s.label}>Current </span><Calc b>{current}</Calc>

@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { CheckCircle2, AlertTriangle, XCircle, ChevronLeft, ChevronRight, Info, ArrowRight } from "lucide-react";
 import { T, FONT } from "@/lib/theme";
-import { QUESTIONS, bucket } from "@/lib/scorecard";
+import { QUESTIONS, bucket, MAX_SCORE, LEGEND } from "@/lib/scorecard";
 import AIBrief from "./AIBrief";
 
 export default function Scorecard({
@@ -73,7 +73,7 @@ export default function Scorecard({
               <div style={{ fontSize: 48, fontWeight: 800, color: toneCol, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.04em" }}>
                 {total}
               </div>
-              <div style={{ color: T.dim, fontSize: 16, fontWeight: 600 }}>/ 20 points</div>
+              <div style={{ color: T.dim, fontSize: 16, fontWeight: 600 }}>/ {MAX_SCORE} points</div>
             </div>
             <div style={{ color: T.dim, fontSize: 14, lineHeight: 1.6, fontWeight: 500, maxWidth: 620 }}>
               {verdict.detail}
@@ -83,19 +83,14 @@ export default function Scorecard({
           {/* Buckets */}
           <div style={{ ...card, marginTop: 18 }}>
             <h3 style={{ fontSize: 14, fontWeight: 700, color: T.dim, letterSpacing: "0.05em", margin: "0 0 14px" }}>SCORE LEGEND</h3>
-            {[
-              ["16–20", "Worth deep research", T.green, T.greenSoft],
-              ["11–15", "Proceed carefully", T.peach, T.peachSoft],
-              ["0–10", "Reject", T.red, T.redSoft],
-            ].map(([range, lab, c, bg]) => {
-              const active =
-                (verdict.tone === "green" && range === "16–20") ||
-                (verdict.tone === "amber" && range === "11–15") ||
-                (verdict.tone === "red" && range === "0–10");
+            {LEGEND.map(({ range, label, tone }) => {
+              const c = tone === "green" ? T.green : tone === "amber" ? T.peach : T.red;
+              const bg = tone === "green" ? T.greenSoft : tone === "amber" ? T.peachSoft : T.redSoft;
+              const active = verdict.tone === tone;
               return (
-                <div key={range as string} style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 13px", marginBottom: 6, background: active ? (bg as string) : "transparent", border: `1px solid ${active ? c + "44" : T.border}`, borderRadius: 11 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: c as string, fontVariantNumeric: "tabular-nums", minWidth: 60 }}>{range as string}</div>
-                  <div style={{ fontSize: 13.5, fontWeight: 600, color: T.text }}>{lab as string}</div>
+                <div key={range} style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 13px", marginBottom: 6, background: active ? bg : "transparent", border: `1px solid ${active ? c + "44" : T.border}`, borderRadius: 11 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: c, fontVariantNumeric: "tabular-nums", minWidth: 60 }}>{range}</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: T.text }}>{label}</div>
                 </div>
               );
             })}
@@ -158,7 +153,7 @@ export default function Scorecard({
             Should you buy {companyName || ticker}?
           </h1>
           <p style={{ color: T.dim, fontSize: 14.5, margin: 0, fontWeight: 500, lineHeight: 1.55 }}>
-            Ten questions that decide if you've earned the right to own this business.
+            {QUESTIONS.length} questions that decide if you've earned the right to own this business.
             Score each: <strong style={{ color: T.red }}>0 weak</strong>,{" "}
             <strong style={{ color: T.peach }}>1 partial</strong>,{" "}
             <strong style={{ color: T.green }}>2 strong</strong>. Be honest — lying to yourself here costs real money.
@@ -172,7 +167,7 @@ export default function Scorecard({
               {answered} of {QUESTIONS.length} answered
             </span>
             <span style={{ fontVariantNumeric: "tabular-nums", fontSize: 14, fontWeight: 700, color: T.violet }}>
-              {total} <span style={{ color: T.faint, fontWeight: 500 }}>/ 20</span>
+              {total} <span style={{ color: T.faint, fontWeight: 500 }}>/ {MAX_SCORE}</span>
             </span>
           </div>
           <div style={{ height: 7, background: T.soft2, borderRadius: 999, overflow: "hidden" }}>
