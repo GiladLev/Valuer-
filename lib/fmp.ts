@@ -3,7 +3,8 @@
 // "Premium / Special Endpoint"). The only data endpoint still free is /profile, which we
 // use purely for the live share price, market cap and company metadata. All financial
 // statements come from SEC EDGAR instead — see lib/sec.ts.
-import { getSecFundamentals } from "@/lib/sec";
+import { getSecFundamentals, getSecCompanyInfo } from "@/lib/sec";
+import { generateBuffettSummary } from "@/lib/buffett";
 
 const BASE = "https://financialmodelingprep.com/stable";
 
@@ -41,7 +42,11 @@ const clampMult = (x: number, lo: number, hi: number, fb: number) =>
 // and metadata come from FMP /profile. The returned shape is what Analysis.tsx consumes.
 export async function buildFundamentals(rawTicker: string) {
   const ticker = rawTicker.trim().toUpperCase();
-  const [profile, sec] = await Promise.all([getProfile(ticker), getSecFundamentals(ticker)]);
+  const [profile, sec, secInfo] = await Promise.all([
+    getProfile(ticker),
+    getSecFundamentals(ticker),
+    getSecCompanyInfo(ticker),
+  ]);
 
   const price = Number(profile?.price || 0);
   const marketCap = Number(profile?.marketCap || 0) / 1e6; // mm
@@ -76,7 +81,7 @@ export async function buildFundamentals(rawTicker: string) {
   const avgEvEbitda5Y = clampMult(ebitda > 0 ? ev / ebitda : 0, 4, 40, 14);
   const avgEvFcf5Y = clampMult(fcf > 0 ? ev / fcf : 0, 5, 60, 22);
 
-  return {
+  const payloadBase = {
     ticker,
     companyName: profile?.companyName || sec.entityName || ticker,
     currency: profile?.currency || "USD",
@@ -101,5 +106,14 @@ export async function buildFundamentals(rawTicker: string) {
     avgPE5Y,
     avgEvEbitda5Y,
     avgEvFcf5Y,
+    secInfo,
+    description: profile?.description || "",
+  };
+
+  const buffettSummary = generateBuffettSummary(payloadBase);
+
+  return {
+    ...payloadBase,
+    buffettSummary,
   };
 }
