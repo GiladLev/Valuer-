@@ -5,7 +5,7 @@ import {
   ResponsiveContainer, ComposedChart, AreaChart, BarChart,
   Bar, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine,
 } from "recharts";
-import { AlertTriangle, Layers, ChevronLeft, ArrowRight } from "lucide-react";
+import { AlertTriangle, Layers, ChevronLeft, ArrowRight, ExternalLink, CheckCircle2, Info } from "lucide-react";
 import { T, FONT } from "@/lib/theme";
 
 const YEARS = [2025, 2026, 2027, 2028, 2029, 2030, 2031];
@@ -271,6 +271,141 @@ export default function Analysis({
             <span style={{ width: 12, height: 12, borderRadius: 4, background: T.soft, border: `1px solid ${T.border}` }} /> Auto-calculated
           </span>
         </div>
+
+        {/* 00 Company Summary & SEC Filings */}
+        {data.buffettSummary && (
+          <div style={{ ...s.card, marginBottom: 18, direction: "rtl", textAlign: "right" }}>
+            <SectionTitle n="00" hint="Warren Buffett Checklist & SEC Filing Status">
+              פרופיל חברה וסטטוס דיווחים
+            </SectionTitle>
+
+            <div style={{
+              background: `linear-gradient(135deg, ${T.violetSoft} 0%, #fff 60%)`,
+              border: `1.5px solid ${T.violetBorder}`,
+              borderRadius: 14, padding: "16px 20px", marginBottom: 18,
+            }}>
+              <div style={{ fontSize: 13, color: T.violetText, fontWeight: 700, marginBottom: 5 }}>
+                ניתוח על פי עקרונות ההשקעה של וורן באפט (וורדיקט כללי)
+              </div>
+              <div style={{ fontSize: 15.5, fontWeight: 800, color: T.text, lineHeight: 1.5 }}>
+                {data.buffettSummary.overallVerdict}
+              </div>
+            </div>
+
+            {/* Buffett Pillars Grid */}
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+              gap: 14,
+              marginBottom: 20
+            }}>
+              {[
+                data.buffettSummary.circleOfCompetence,
+                data.buffettSummary.economicMoat,
+                data.buffettSummary.financialDurability,
+                data.buffettSummary.filingInsight
+              ].map((pillar: any, idx: number) => {
+                const colors = {
+                  strong: { text: T.green, bg: T.greenSoft, label: "חזק" },
+                  neutral: { text: T.peach, bg: T.peachSoft, label: "נייטרלי" },
+                  warning: { text: T.red, bg: T.redSoft, label: "אזהרה" }
+                }[pillar.verdict as "strong" | "neutral" | "warning"] || { text: T.dim, bg: T.soft, label: "לא ידוע" };
+
+                return (
+                  <div key={idx} style={{
+                    background: T.soft, border: `1px solid ${T.border}`,
+                    borderRadius: 12, padding: "14px 16px", display: "flex", flexDirection: "column", justifyContent: "space-between"
+                  }}>
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                        <span style={{ fontSize: 13.5, fontWeight: 800, color: T.text }}>{pillar.title}</span>
+                        <span style={{
+                          fontSize: 10.5, fontWeight: 700, color: colors.text,
+                          background: colors.bg, padding: "2px 8px", borderRadius: 999
+                        }}>
+                          {colors.label}
+                        </span>
+                      </div>
+                      <p style={{ fontSize: 12.5, color: T.dim, lineHeight: 1.55, margin: 0, fontWeight: 500 }}>
+                        {pillar.text}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* SEC Filings Table */}
+            {data.secInfo && (
+              <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 18, direction: "ltr", textAlign: "left" }}>
+                <h3 style={{ ...s.h, fontSize: 14.5, color: T.text, margin: "0 0 12px", direction: "rtl", textAlign: "right" }}>
+                  סטטוס דיווחים רשמי ב-SEC (SEC EDGAR Filings)
+                </h3>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 600 }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: "left", padding: "6px 8px", fontSize: 11, color: T.faint, fontWeight: 700, borderBottom: `1px solid ${T.border}` }}>Document Type</th>
+                        <th style={{ textAlign: "left", padding: "6px 8px", fontSize: 11, color: T.faint, fontWeight: 700, borderBottom: `1px solid ${T.border}` }}>Filing Date</th>
+                        <th style={{ textAlign: "left", padding: "6px 8px", fontSize: 11, color: T.faint, fontWeight: 700, borderBottom: `1px solid ${T.border}` }}>Report Period End</th>
+                        <th style={{ textAlign: "left", padding: "6px 8px", fontSize: 11, color: T.faint, fontWeight: 700, borderBottom: `1px solid ${T.border}` }}>Filing ID (Accession #)</th>
+                        <th style={{ textAlign: "right", padding: "6px 8px", fontSize: 11, color: T.faint, fontWeight: 700, borderBottom: `1px solid ${T.border}` }}>Interactive Viewer</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { label: "Annual Report (Form 10-K)", key: "latest10K" },
+                        { label: "Quarterly Report (Form 10-Q)", key: "latest10Q" },
+                        { label: "Registration Statement (Form S-1)", key: "s1" }
+                      ].map(({ label, key }) => {
+                        const filing = data.secInfo[key];
+                        return (
+                          <tr key={key} style={{ borderBottom: `1px solid ${T.border}` }}>
+                            <td style={{ padding: "10px 8px", fontSize: 12.5, fontWeight: 700, color: T.text }}>{label}</td>
+                            <td style={{ padding: "10px 8px", fontSize: 12.5, color: T.dim, ...s.num }}>
+                              {filing ? filing.filingDate : "—"}
+                            </td>
+                            <td style={{ padding: "10px 8px", fontSize: 12.5, color: T.dim, ...s.num }}>
+                              {filing ? filing.reportDate : "—"}
+                            </td>
+                            <td style={{ padding: "10px 8px", fontSize: 11, color: T.faint, fontFamily: "'JetBrains Mono', monospace" }}>
+                              {filing ? filing.accessionNumber : "—"}
+                            </td>
+                            <td style={{ padding: "10px 8px", textAlign: "right" }}>
+                              {filing ? (
+                                <a
+                                  href={filing.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{
+                                    display: "inline-flex", alignItems: "center", gap: 5,
+                                    color: T.violetText, fontWeight: 700, fontSize: 12,
+                                    textDecoration: "none", background: T.violetSoft,
+                                    padding: "4px 10px", borderRadius: 8, border: `1px solid ${T.violetBorder}`
+                                  }}
+                                >
+                                  Read iXBRL <ExternalLink size={12} />
+                                </a>
+                              ) : (
+                                <span style={{ fontSize: 11.5, color: T.faint }}>Not found / N/A</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", color: T.faint, fontSize: 11, fontWeight: 500, direction: "rtl", textAlign: "right" }}>
+                  <Info size={13} color={T.violet} />
+                  <span>
+                    מזהה המגזר (SIC) של החברה: <strong>{data.secInfo.sic}</strong> ({data.secInfo.sicDescription}) · בורסות רישום: {data.secInfo.exchanges.join(", ")}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 01 Basics */}
         <div style={{ ...s.card, marginBottom: 18 }}>

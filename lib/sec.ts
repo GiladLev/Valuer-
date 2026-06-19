@@ -154,3 +154,105 @@ export async function getSecFundamentals(rawTicker: string): Promise<SecFundamen
     epsDiluted, sharesOutstanding,
   };
 }
+
+export type SecFilingInfo = {
+  form: string;
+  filingDate: string;
+  reportDate: string;
+  primaryDocument: string;
+  accessionNumber: string;
+  url: string;
+};
+
+export type SecCompanyInfo = {
+  cik: string;
+  name: string;
+  sic: string;
+  sicDescription: string;
+  tickers: string[];
+  exchanges: string[];
+  fiscalYearEnd: string;
+  latest10K: SecFilingInfo | null;
+  latest10Q: SecFilingInfo | null;
+  s1: SecFilingInfo | null;
+};
+
+export function getSecFilingUrl(cik: string, accessionNumber: string, primaryDocument: string): string {
+  const cleanAcc = accessionNumber.replace(/-/g, "");
+  const cleanCik = String(Number(cik));
+  return `https://www.sec.gov/ix?doc=/Archives/edgar/data/${cleanCik}/${cleanAcc}/${primaryDocument}`;
+}
+
+export async function getSecCompanyInfo(rawTicker: string): Promise<SecCompanyInfo | null> {
+  const ticker = rawTicker.trim().toUpperCase();
+  const cik = (await tickerMap())[ticker];
+  if (!cik) return null;
+
+  try {
+    const data = await secGet<any>(`https://data.sec.gov/submissions/CIK${cik}.json`, 86400);
+    const recent = data.filings?.recent;
+    if (!recent) return null;
+
+    let latest10K: SecFilingInfo | null = null;
+    let latest10Q: SecFilingInfo | null = null;
+    let s1: SecFilingInfo | null = null;
+
+    const forms = recent.form || [];
+    const dates = recent.filingDate || [];
+    const reportDates = recent.reportDate || [];
+    const docs = recent.primaryDocument || [];
+    const accs = recent.accessionNumber || [];
+
+    for (let i = 0; i < forms.length; i++) {
+      const f = forms[i];
+      if (!latest10K && f === "10-K") {
+        latest10K = {
+          form: f,
+          filingDate: dates[i],
+          reportDate: reportDates[i],
+          primaryDocument: docs[i],
+          accessionNumber: accs[i],
+          url: getSecFilingUrl(cik, accs[i], docs[i]),
+        };
+      }
+      if (!latest10Q && f === "10-Q") {
+        latest10Q = {
+          form: f,
+          filingDate: dates[i],
+          reportDate: reportDates[i],
+          primaryDocument: docs[i],
+          accessionNumber: accs[i],
+          url: getSecFilingUrl(cik, accs[i], docs[i]),
+        };
+      }
+      if (!s1 && (f === "S-1" || f === "S-1/A")) {
+        s1 = {
+          form: f,
+          filingDate: dates[i],
+          reportDate: reportDates[i],
+          primaryDocument: docs[i],
+          accessionNumber: accs[i],
+          url: getSecFilingUrl(cik, accs[i], docs[i]),
+        };
+      }
+      if (latest10K && latest10Q && s1) break;
+    }
+
+    return {
+      cik,
+      name: data.name || data.entityName || "",
+      sic: data.sic || "",
+      sicDescription: data.sicDescription || "",
+      tickers: data.tickers || [],
+      exchanges: data.exchanges || [],
+      fiscalYearEnd: data.fiscalYearEnd || "",
+      latest10K,
+      latest10Q,
+      s1,
+    };
+  } catch (e) {
+    console.error(`Failed to fetch SEC submissions for CIK ${cik}:`, e);
+    return null;
+  }
+}
+
